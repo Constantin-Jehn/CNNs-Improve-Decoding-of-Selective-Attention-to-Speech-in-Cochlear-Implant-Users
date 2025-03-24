@@ -1,0 +1,136 @@
+Experimental setup
+
+Throughout the experiment 20 different stimuli are presented - this is referred to as „trial“.
+There are two orders in which stimuli were presented. 
+Each stimulus has a three-digit identifier, carrying additional information:
+
+ D1: Describes the experimental condition. 1 = Single Speakers, 2 = Competing Speakers
+ D2: Describes which story is attended. 1 = „Elbenwald“, 2 = „Polarnacht“
+ D3: Describes which part of both audiobooks is played. 
+ 
+|    D1 |       D2 |   D3 | meaning   | 
+| SS/CS | Attended | Part |           |           
+|-------+----------+------+-----------+
+|     1 |        1 |    1 | SS/Elb/1  |
+|     1 |        1 |    2 | SS/Elb/2  | 
+|     1 |        1 |    3 | SS/Elb/3  | 
+|     1 |        1 |    4 | SS/Elb/4  | 
+|     2 |        1 |    5 | CS/Elb/5  | 
+|     2 |        1 |    6 | CS/Elb/6  | 
+|     2 |        1 |    7 | CS/Elb/7  | 
+|     2 |        1 |    8 | CS/Elb/8  | 
+|     2 |        1 |    9 | CS/Elb/9  | 
+|     2 |        1 |    0 | CS/Elb/10 | 
+|     1 |        2 |    1 | SS/Pol/1  | 
+|     1 |        2 |    2 | SS/Pol/2  | 
+|     1 |        2 |    3 | SS/Pol/3  | 
+|     1 |        2 |    4 | SS/Pol/4  | 
+|     2 |        2 |    5 | SS/Pol/5  | 
+|     2 |        2 |    6 | SS/Pol/6  | 
+|     2 |        2 |    7 | SS/Pol/7  |
+|     2 |        2 |    8 | SS/Pol/8  | 
+|     2 |        2 |    9 | SS/Pol/9  | 
+|     2 |        2 |    0 | SS/Pol/0  |
+
+The stimuli always consist of two separated audio-streams, that are presented through the left and right speaker separately. 
+In the single speaker scenario one of the streams (namely the distractor) remains silent.
+For each stimulus code, the original file sampled at 48kHz is saved (attended_wav and distractor_wav).
+Moreover, I precomputed the speech envelope sampled at 1kHz (attended_env, distractor_env).
+
+
+The subjects are also described, by a three-digit identifier XYY.
+X: Group of subjects. 1 = CI patient 2 = hearing aid 3 = normal hearing
+YY: consecutive number of subject.
+
+E.g. 112: 12th CI patient.
+
+For CI-patients, sometimes electrodes had to be removed at the position of the magnet. 
+The corresponding rows are saved under „taken_out_indices“ and remain constant over all trials.
+
+For each subject 20 trials are measured.
+
+„trial“ is a consecutive number in [1,2,…,20]
+trial contains the the EEG dataset of size (33, seconds * 1000), as it is sampled at 1kHz.
+The last two rows are the auxiliary channels, containing a low-quality but aligned recording of the stimulus. 
+I left it in the dataset, such that the audio alignment can be checked at any point.
+
+Data format
+
+The CI-Attention dataset is stored in a hdf5 file, using the python library h5py.
+
+Look at https://docs.h5py.org/en/stable/quick.html for a brief overview. 
+The format allows to incorporate a folder structure within one file, such that the hierarchy of subjects, trials and different stimuli can be represented.
+The format has „datasets“, where stimuli and the EEG-data are stored as np.arrays.
+The "eeg" folder contains the raw EEG data. The eeg_ica folder contains EEG data, that was already ICA cleaned before writing to the file.
+„Attributes“ allow to store metadata.
+
+
+Data Organization
+
+The hdf5 file is organised in the following way:
+
+
+data_file
+|
+|-stimulus_files
+|	|
+|	|-stimulus_code
+|		|
+|		|attended_wav,
+|		|attended_env
+|		|distractor_wav
+|		|distractor_env
+|
+|-eeg	
+|	|
+|	|-subject_code
+|		|taken_out_indices
+|		|
+|		|-trial, trial.attrs[‚stimulus‘]
+|
+|-eeg_ica	
+	|
+	|-subject_code
+		|taken_out_indices
+		|
+		|-trial, trial.attrs[‚stimulus‘]
+
+
+Example of file reading in python:
+
+import h5py
+
+#dir_h5: directory of hdf5 file
+
+with h5py.File(dir_h5, 'r') as f:
+    #path to first trial of subject 112
+    eeg_path = f'eeg/{str(112)}/{str(1)}'
+
+    #get the stimulus code
+    stim_code = f[eeg_path].attrs['stimulus']
+
+    #paths to the envelopes
+    env_attended_path = f'stimulus_files/{stim_code}/attended_env'
+    env_distractor_path = f'stimulus_files/{stim_code}/distractor_env'
+
+    #get the envelope data
+    #[:] is necessary to obtain the data array directly
+    env_attended, env_distractor = f[env_attended_path][:], f[env_distractor_path][:]
+
+    #get the eeg data
+    eeg_data = f[eeg_path][:]
+    assert eeg_data.shape[0] == 33, "EEG measurement requires 33 channels. Loaded that is incorrect."
+    
+    #drop auxiliary channels
+    eeg_data = eeg_data[:31,:]
+
+f.close()
+
+
+
+
+
+
+
+
+
